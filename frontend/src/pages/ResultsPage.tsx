@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Award, CheckCircle2, AlertTriangle, ArrowRight, RotateCcw,
   BarChart2, Sparkles, Home, LayoutDashboard, TrendingUp,
-  Shield, ChevronRight
+  Shield, ChevronRight, Printer
 } from 'lucide-react';
 import {
   ResponsiveContainer, RadarChart, PolarGrid,
@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { Navbar } from '../components/layout/Navbar';
 import { FeedbackListCard } from '../components/feedback/FeedbackListCard';
+import { ExpandableTimeline } from '../components/results/ExpandableTimeline';
 import { useInterviewStore } from '../lib/store';
 import { buildRadarData, resolveVerdictDisplay } from '../lib/feedbackDisplay';
 
@@ -27,7 +28,7 @@ const fadeUp = {
 export const ResultsPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { completedSessions, resetInterview, selectedCandidate, feedback: currentFeedback } = useInterviewStore();
+  const { completedSessions, resetInterview, selectedCandidate, feedback: currentFeedback, messages } = useInterviewStore();
 
   // Try completed sessions first, then fall back to in-progress state
   const session = completedSessions.find((s) => s.sessionId === sessionId);
@@ -72,6 +73,10 @@ export const ResultsPage: React.FC = () => {
     navigate('/dashboard');
   };
 
+  const handleDownloadReport = () => {
+    window.print();
+  };
+
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="blob blob-1 w-96 h-96 top-0 -left-32 opacity-10" />
@@ -85,7 +90,7 @@ export const ResultsPage: React.FC = () => {
           <motion.nav
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2 text-xs text-[var(--text-muted)]"
+            className="flex items-center gap-2 text-xs text-[var(--text-muted)] no-print"
           >
             <Link to="/" className="hover:text-[var(--text-primary)] transition-colors flex items-center gap-1">
               <Home className="w-3.5 h-3.5" /> Home
@@ -132,10 +137,18 @@ export const ResultsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap no-print">
+                <button
+                  onClick={handleDownloadReport}
+                  className="flex items-center gap-2 px-4 py-2.5 glass text-white text-xs font-semibold
+                             rounded-xl hover:scale-105 transition-all duration-200"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Print / Export
+                </button>
                 <button
                   onClick={handleNewInterview}
-                  className="flex items-center gap-2 px-5 py-2.5 glass text-white text-xs font-semibold
+                  className="flex items-center gap-2 px-4 py-2.5 glass text-white text-xs font-semibold
                              rounded-xl hover:scale-105 transition-all duration-200"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -262,6 +275,11 @@ export const ResultsPage: React.FC = () => {
               />
             </motion.div>
           </div>
+
+          {/* Q&A Timeline */}
+          <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={5.5}>
+            <ExpandableTimeline messages={messages} topicScores={feedback.topic_scores} />
+          </motion.div>
 
           {/* Bottom CTA */}
           <motion.div
