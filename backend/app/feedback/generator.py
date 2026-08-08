@@ -94,20 +94,49 @@ class FeedbackGenerator:
         short_ratio = len(short_answer_turns) / max(len(history), 1)
         return avg_words, short_ratio, short_answer_turns, detailed_answer_turns
 
-    def _word_count_to_score(self, word_count: int) -> int:
-        if word_count == 0:
+    def _evaluate_answer_score(self, answer: str) -> int:
+        ans = (answer or "").strip()
+        if not ans:
             return 5
-        if word_count < 3:
-            return 10
-        if word_count < 10:
-            return 18
-        if word_count < 20:
-            return 38
-        if word_count < 40:
-            return 58
-        if word_count < 60:
-            return 72
-        return 85
+
+        words = ans.split()
+        word_count = len(words)
+        ans_lower = ans.lower()
+
+        # Check for dismissive / low-effort responses
+        dismissive_phrases = {
+            "idk", "no idea", "pass", "n/a", "dont know", "don't know",
+            "maybe", "sure", "ok", "yes", "no", "none", "skip", "idk man"
+        }
+        if ans_lower in dismissive_phrases or (word_count <= 2 and any(p in ans_lower for p in dismissive_phrases)):
+            base = 5 + (len(ans) * 3) + (hash(ans_lower) % 5)
+            return max(5, min(18, base))
+
+        # Continuous base score calculation based on word count & character length
+        if word_count < 5:
+            base_score = 15 + word_count * 3 + len(ans) * 0.2
+        elif word_count < 15:
+            base_score = 30 + (word_count - 5) * 2.5 + len(ans) * 0.1
+        elif word_count < 30:
+            base_score = 55 + (word_count - 15) * 1.2 + (len(ans) % 7) * 0.4
+        else:
+            base_score = 75 + min(15, (word_count - 30) * 0.35 + (len(ans) % 5) * 0.5)
+
+        # Technical keyword substance bonus
+        tech_keywords = {
+            "vector", "vectors", "embedding", "embeddings", "rag", "retrieval", "chroma", "chromadb",
+            "prompt", "prompts", "prompting", "llm", "llms", "fastapi", "langgraph", "agent", "agents",
+            "mcp", "protocol", "docker", "kubernetes", "k8s", "latency", "tokens", "token", "cosine",
+            "similarity", "chunking", "chunk", "chunks", "splitter", "indexing", "index", "context",
+            "schema", "observability", "monitoring", "ollama", "qwen", "fine-tuning", "evaluation",
+            "evals", "metadata", "ingestion", "pipeline", "containerized", "cross-encoders", "reranking"
+        }
+
+        found_keywords = {w.strip(".,!?;:()[]\"'") for w in words if w.strip(".,!?;:()[]\"'").lower() in tech_keywords}
+        keyword_bonus = min(15, len(found_keywords) * 2)
+
+        final_score = int(round(base_score + keyword_bonus))
+        return max(5, min(100, final_score))
 
     def _topic_scores_from_history(self, history: List[Dict[str, Any]]) -> List[TopicScore]:
         day_buckets: Dict[int, Dict[str, Any]] = {}
@@ -116,21 +145,21 @@ class FeedbackGenerator:
             if day is None:
                 continue
             ans = (turn.get("answer") or "").strip()
-            word_count = len(ans.split())
             title = turn.get("day_title") or f"Day {day}"
+            turn_score = self._evaluate_answer_score(ans)
             if day not in day_buckets:
-                day_buckets[day] = {"title": title, "word_counts": []}
-            day_buckets[day]["word_counts"].append(word_count)
+                day_buckets[day] = {"title": title, "scores": []}
+            day_buckets[day]["scores"].append(turn_score)
 
         scores: List[TopicScore] = []
         for day in sorted(day_buckets.keys()):
             bucket = day_buckets[day]
-            avg_words = sum(bucket["word_counts"]) / len(bucket["word_counts"])
+            avg_score = sum(bucket["scores"]) / len(bucket["scores"])
             scores.append(
                 TopicScore(
                     day=day,
                     subject=bucket["title"],
-                    score=self._word_count_to_score(int(avg_words)),
+                    score=int(round(avg_score)),
                 )
             )
         return scores

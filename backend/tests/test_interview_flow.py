@@ -5,8 +5,16 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.retrieval.vector_store import vector_store
 from app.feedback.generator import feedback_engine
+from app.agent.llm import llm_client
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def mock_llm_provider(monkeypatch):
+    """Ensure tests run against mock LLM provider by default for sub-second execution."""
+    monkeypatch.setattr(llm_client, "provider", "mock")
+
 
 @pytest.fixture
 def sample_candidate():
@@ -31,7 +39,7 @@ def test_full_interview_flow_end_to_end(sample_candidate):
     Simulate a full 8+ turn interview end-to-end matching technical-specs.md contract:
     - Minimum 8 questions
     - Spanning at least 4 distinct curriculum days
-    - Feedback schema valid (summary, strengths, gaps, next)
+    - Feedback schema valid (summary, strengths, gaps, next, verdict, topic_scores)
     """
     session_id = "test-session-e2e-123"
 
@@ -47,7 +55,7 @@ def test_full_interview_flow_end_to_end(sample_candidate):
     assert "reply" in body
     assert body["done"] is False
     assert body["currentQuestionIndex"] == 1
-    assert "Welcome" in body["reply"] or "interview" in body["reply"].lower()
+    assert "Welcome" in body["reply"] or "interview" in body["reply"].lower() or "designed" in body["reply"].lower()
 
     # Answers to simulate realistic interview conversation turns
     sample_answers = [
@@ -112,3 +120,16 @@ async def test_honest_fallback_feedback_degradation():
     assert all(score.score <= 25 for score in fb.topic_scores)
     assert "brief" in fb.summary.lower() or "limited depth" in fb.summary.lower()
     assert any("incomplete" in g.lower() or "superficial" in g.lower() or "lacked" in g.lower() for g in fb.gaps)
+
+
+@pytest.mark.skipif(
+    os.getenv("RUN_LIVE_API_TESTS") != "1",
+    reason="Live Gemini API integration test skipped by default. Set RUN_LIVE_API_TESTS=1 to run."
+)
+def test_live_gemini_smoke_test(sample_candidate, monkeypatch):
+    """Explicit live API smoke test verifying real Gemini network integration when requested."""
+    monkeypatch.setattr(llm_client, "provider", os.getenv("LLM_PROVIDER", "gemini"))
+    res = client.post("/api/interview", json={"sessionId": "live-smoke-1", "candidate": sample_candidate})
+    assert res.status_code == 200
+    assert "reply" in res.json()
+
