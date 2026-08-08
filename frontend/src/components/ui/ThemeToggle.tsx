@@ -10,9 +10,10 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
   return (
     <button
       onClick={toggleTheme}
-      aria-label="Toggle theme"
+      aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
       className={`relative w-9 h-9 rounded-xl glass flex items-center justify-center
-        hover:scale-110 transition-transform duration-200 ${className}`}
+        hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50
+        transition-transform duration-200 ${className}`}
     >
       <AnimatePresence mode="wait" initial={false}>
         {isDark ? (
