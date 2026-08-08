@@ -11,7 +11,9 @@ import {
   PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip
 } from 'recharts';
 import { Navbar } from '../components/layout/Navbar';
+import { FeedbackListCard } from '../components/feedback/FeedbackListCard';
 import { useInterviewStore } from '../lib/store';
+import { buildRadarData, resolveVerdictDisplay } from '../lib/feedbackDisplay';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -21,51 +23,18 @@ const fadeUp = {
   }),
 };
 
-// Build radar data from probed days + feedback
-const buildRadarData = (probedDays: number[]) => {
-  const domainMap: Record<number, string> = {
-    1: 'Foundations', 2: 'Python Basics', 3: 'Data Structures',
-    4: 'Algorithms', 5: 'APIs', 6: 'Databases', 7: 'Embeddings',
-    8: 'Transformers', 9: 'Fine-Tuning', 10: 'Prompting',
-    11: 'LangChain', 12: 'LangGraph', 13: 'Agents',
-    14: 'RAG', 15: 'Vector DBs', 16: 'ChromaDB',
-    17: 'Evals', 18: 'Deployment', 19: 'Observability', 20: 'MCP',
-  };
-
-  const fixed = [
-    { subject: 'Embeddings & Vectors', score: 88 },
-    { subject: 'RAG & Retrieval', score: 82 },
-    { subject: 'Prompting & LLMs', score: 79 },
-    { subject: 'LangGraph Agents', score: 91 },
-    { subject: 'MCP Protocols', score: 74 },
-    { subject: 'Deployment & Ops', score: 85 },
-  ];
-
-  // Overlay probed days as extra axes if we have them
-  if (probedDays.length > 0) {
-    const extras = probedDays.slice(0, 3).map((d) => ({
-      subject: domainMap[d] ?? `Day ${d}`,
-      score: 65 + Math.floor(Math.random() * 30), // deterministic approximation
-    }));
-    // blend extras into fixed list
-    extras.forEach((e, i) => { if (fixed[i]) fixed[i] = e; });
-  }
-
-  return fixed;
-};
-
 // ── ResultsPage ───────────────────────────────────────────────────────
 export const ResultsPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { completedSessions, resetInterview, selectedCandidate, feedback: currentFeedback, progress } = useInterviewStore();
+  const { completedSessions, resetInterview, selectedCandidate, feedback: currentFeedback } = useInterviewStore();
 
   // Try completed sessions first, then fall back to in-progress state
   const session = completedSessions.find((s) => s.sessionId === sessionId);
   const candidate = session?.candidate ?? selectedCandidate;
   const feedback = session?.feedback ?? currentFeedback;
-
-  const radarData = buildRadarData(progress.probedDaysList);
+  const verdictDisplay = resolveVerdictDisplay(feedback?.verdict);
+  const radarData = buildRadarData(feedback?.topic_scores);
 
   if (!feedback) {
     return (
@@ -147,10 +116,10 @@ export const ResultsPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-3 mb-1 flex-wrap">
                     <h1 className="font-heading text-2xl font-bold text-white">Technical Assessment</h1>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
-                                     px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      <Shield className="w-3.5 h-3.5" />
-                      Hire Recommended
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
+                                     px-3 py-1 rounded-full border ${verdictDisplay.badgeClass}`}>
+                      <Shield className={`w-3.5 h-3.5 ${verdictDisplay.iconClass}`} />
+                      {verdictDisplay.label}
                     </span>
                   </div>
                   <p className="text-sm text-white/70">
@@ -214,119 +183,83 @@ export const ResultsPage: React.FC = () => {
                 Curriculum Domain Mastery
               </h3>
               <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="72%" data={radarData}>
-                    <PolarGrid stroke="rgba(148,163,184,0.15)" />
-                    <PolarAngleAxis
-                      dataKey="subject"
-                      tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
-                    />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="rgba(148,163,184,0.2)" tick={false} />
-                    <Radar
-                      name="Score"
-                      dataKey="score"
-                      stroke="#6366f1"
-                      fill="#6366f1"
-                      fillOpacity={0.35}
-                      strokeWidth={2}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: 'var(--glass-bg)',
-                        border: '1px solid var(--glass-border)',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {radarData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart cx="50%" cy="50%" outerRadius="72%" data={radarData}>
+                      <PolarGrid stroke="rgba(148,163,184,0.15)" />
+                      <PolarAngleAxis
+                        dataKey="subject"
+                        tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                      />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="rgba(148,163,184,0.2)" tick={false} />
+                      <Radar
+                        name="Score"
+                        dataKey="score"
+                        stroke="#6366f1"
+                        fill="#6366f1"
+                        fillOpacity={0.35}
+                        strokeWidth={2}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'var(--glass-bg)',
+                          border: '1px solid var(--glass-border)',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          color: 'var(--text-primary)',
+                        }}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="h-full flex items-center justify-center text-sm text-[var(--text-muted)] italic">
+                    No topic scores available for this session.
+                  </p>
+                )}
               </div>
             </motion.div>
 
             {/* Strengths */}
-            <motion.div
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={3}
-              className="glass-card rounded-2xl p-6 border border-emerald-500/20 bg-emerald-500/5"
-            >
-              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2 mb-4">
-                <CheckCircle2 className="w-4 h-4" />
-                Demonstrated Strengths
-              </h3>
-              <ul className="space-y-3">
-                {feedback.strengths.map((item, idx) => (
-                  <motion.li
-                    key={idx}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 + idx * 0.08 }}
-                    className="flex items-start gap-3 text-sm text-[var(--text-secondary)] leading-relaxed"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                    {item}
-                  </motion.li>
-                ))}
-              </ul>
+            <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3}>
+              <FeedbackListCard
+                title="Demonstrated Strengths"
+                icon={CheckCircle2}
+                items={feedback.strengths}
+                field="strengths"
+                headerClass="text-emerald-400"
+                cardClass="border border-emerald-500/20 bg-emerald-500/5"
+                bulletClass="bg-emerald-400"
+                animationDelay={0.3}
+              />
             </motion.div>
           </div>
 
           {/* Gaps + Next steps */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <motion.div
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={4}
-              className="glass-card rounded-2xl p-6 border border-amber-500/20 bg-amber-500/5"
-            >
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-4 h-4" />
-                Identified Knowledge Gaps
-              </h3>
-              <ul className="space-y-3">
-                {feedback.gaps.map((item, idx) => (
-                  <motion.li
-                    key={idx}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + idx * 0.08 }}
-                    className="flex items-start gap-3 text-sm text-[var(--text-secondary)] leading-relaxed"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
-                    {item}
-                  </motion.li>
-                ))}
-              </ul>
+            <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={4}>
+              <FeedbackListCard
+                title="Identified Knowledge Gaps"
+                icon={AlertTriangle}
+                items={feedback.gaps}
+                field="gaps"
+                headerClass="text-amber-400"
+                cardClass="border border-amber-500/20 bg-amber-500/5"
+                bulletClass="bg-amber-400"
+                animationDelay={0.4}
+              />
             </motion.div>
 
-            <motion.div
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={5}
-              className="glass-card rounded-2xl p-6 border border-primary-500/20 bg-primary-500/5"
-            >
-              <h3 className="text-xs font-bold uppercase tracking-wider text-primary-400 flex items-center gap-2 mb-4">
-                <ArrowRight className="w-4 h-4" />
-                Actionable Growth Plan
-              </h3>
-              <ul className="space-y-3">
-                {feedback.next.map((item, idx) => (
-                  <motion.li
-                    key={idx}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 + idx * 0.08 }}
-                    className="flex items-start gap-3 text-sm text-[var(--text-secondary)] leading-relaxed"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary-400 mt-1.5 shrink-0" />
-                    {item}
-                  </motion.li>
-                ))}
-              </ul>
+            <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={5}>
+              <FeedbackListCard
+                title="Actionable Growth Plan"
+                icon={ArrowRight}
+                items={feedback.next}
+                field="next"
+                headerClass="text-primary-400"
+                cardClass="border border-primary-500/20 bg-primary-500/5"
+                bulletClass="bg-primary-400"
+                animationDelay={0.5}
+              />
             </motion.div>
           </div>
 

@@ -38,11 +38,25 @@ class InterviewRequest(BaseModel):
     message: Optional[str] = Field(None, description="Candidate answer provided on subsequent turns")
 
 
+class TopicScore(BaseModel):
+    day: int = Field(..., description="Curriculum day number probed during the interview")
+    subject: str = Field(..., description="Human-readable topic label for the radar chart axis")
+    score: int = Field(..., ge=0, le=100, description="Mastery score from 0-100 for this topic")
+
+
 class FeedbackData(BaseModel):
     summary: str = Field(..., description="Overall summary of the candidate's interview performance")
     strengths: List[str] = Field(..., description="List of technical strengths demonstrated")
     gaps: List[str] = Field(..., description="List of technical gaps or areas needing improvement")
     next: List[str] = Field(..., description="Actionable next steps for technical growth")
+    verdict: str = Field(
+        ...,
+        description="Hiring recommendation: STRONG_HIRE, HIRE, BORDERLINE, or NO_HIRE",
+    )
+    topic_scores: List[TopicScore] = Field(
+        ...,
+        description="Per-topic mastery scores aligned with probed curriculum days",
+    )
 
 
 class InterviewResponse(BaseModel):

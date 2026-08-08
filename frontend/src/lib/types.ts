@@ -27,11 +27,19 @@ export interface Candidate {
   signals?: CandidateSignals;
 }
 
+export interface TopicScore {
+  day: number;
+  subject: string;
+  score: number;
+}
+
 export interface Feedback {
   summary: string;
   strengths: string[];
   gaps: string[];
   next: string[];
+  verdict: string;
+  topic_scores: TopicScore[];
 }
 
 export interface ChatMessage {

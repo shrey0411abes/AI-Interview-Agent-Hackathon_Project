@@ -88,8 +88,13 @@ def test_full_interview_flow_end_to_end(sample_candidate):
     assert "strengths" in final_feedback and isinstance(final_feedback["strengths"], list)
     assert "gaps" in final_feedback and isinstance(final_feedback["gaps"], list)
     assert "next" in final_feedback and isinstance(final_feedback["next"], list)
+    assert "verdict" in final_feedback and isinstance(final_feedback["verdict"], str)
+    assert "topic_scores" in final_feedback and isinstance(final_feedback["topic_scores"], list)
+    assert final_feedback["verdict"] in {"STRONG_HIRE", "HIRE", "BORDERLINE", "NO_HIRE"}
     assert len(final_feedback["strengths"]) > 0
     assert len(final_feedback["next"]) > 0
+    assert len(final_feedback["topic_scores"]) >= 4
+    assert all("subject" in ts and "score" in ts for ts in final_feedback["topic_scores"])
 
 
 @pytest.mark.asyncio
@@ -102,5 +107,8 @@ async def test_honest_fallback_feedback_degradation():
     ]
     fb = feedback_engine._fallback_feedback("Test User", [7, 10, 12], mock_history)
 
+    assert fb.verdict in {"NO_HIRE", "BORDERLINE"}
+    assert fb.strengths == []
+    assert all(score.score <= 25 for score in fb.topic_scores)
     assert "brief" in fb.summary.lower() or "limited depth" in fb.summary.lower()
     assert any("incomplete" in g.lower() or "superficial" in g.lower() or "lacked" in g.lower() for g in fb.gaps)
