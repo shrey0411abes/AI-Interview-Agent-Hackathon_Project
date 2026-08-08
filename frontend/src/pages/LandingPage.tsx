@@ -9,6 +9,7 @@ import { ThemeToggle } from '../components/ui/ThemeToggle';
 import candidateData from '../data/candidates.json';
 import { Candidate } from '../lib/types';
 import { useInterviewStore } from '../lib/store';
+import { AnimatedNumber } from '../components/ui/AnimatedNumber';
 
 // ── Staggered animation helpers ────────────────────────────────────────
 const fadeUp = {
@@ -235,9 +236,6 @@ export const LandingPage: React.FC = () => {
             >
               View on GitHub
             </a>
-          </motion.div>
-        </section>
-
         {/* ── Stats bar ────────────────────────────────────── */}
         <section className="px-4 sm:px-6 py-8 max-w-4xl mx-auto">
           <motion.div
@@ -249,7 +247,9 @@ export const LandingPage: React.FC = () => {
           >
             {stats.map(({ value, label }) => (
               <div key={label} className="text-center">
-                <p className="font-heading text-3xl font-bold gradient-text">{value}</p>
+                <p className="font-heading text-3xl font-bold gradient-text">
+                  <AnimatedNumber value={value} />
+                </p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">{label}</p>
               </div>
             ))}

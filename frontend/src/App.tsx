@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useThemeStore } from './lib/store';
+import { ToastProvider } from './components/ui/Toast';
 
 // Lazy-loaded pages for smaller initial bundle
 const LandingPage    = lazy(() => import('./pages/LandingPage'));
@@ -50,19 +51,21 @@ const PageLoader: React.FC = () => (
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ThemeRoot>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/"                         element={<LandingPage />} />
-              <Route path="/dashboard"                element={<DashboardPage />} />
-              <Route path="/interview/:candidateId"   element={<InterviewPage />} />
-              <Route path="/results/:sessionId"       element={<ResultsPage />} />
-              <Route path="*"                         element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-        </ThemeRoot>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <ThemeRoot>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/"                         element={<LandingPage />} />
+                <Route path="/dashboard"                element={<DashboardPage />} />
+                <Route path="/interview/:candidateId"   element={<InterviewPage />} />
+                <Route path="/results/:sessionId"       element={<ResultsPage />} />
+                <Route path="*"                         element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </ThemeRoot>
+        </BrowserRouter>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }
