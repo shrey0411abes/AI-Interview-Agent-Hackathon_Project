@@ -15,8 +15,9 @@ class LLMWrapper:
 
     def __init__(self):
         self.provider = os.getenv("LLM_PROVIDER", "mock").lower()
-        self.model_name = os.getenv("MODEL_NAME", "gpt-4o-mini")
+        self.model_name = os.getenv("MODEL_NAME", "gemini-1.5-flash")
         self.openai_key = os.getenv("OPENAI_API_KEY", "")
+        self.gemini_key = os.getenv("GEMINI_API_KEY", "")
 
     async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
         """Generate full text response synchronously or asynchronously."""
@@ -31,6 +32,18 @@ class LLMWrapper:
                 return str(res.content)
             except Exception as e:
                 print(f"[LLM Warning] OpenAI API call failed: {e}. Using fallback generator.")
+                return await self._fallback_generate(system_prompt, user_prompt)
+        elif self.provider == "gemini" and self.gemini_key and "your-gemini-api-key" not in self.gemini_key:
+            try:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                from langchain_core.messages import SystemMessage, HumanMessage
+
+                llm = ChatGoogleGenerativeAI(model=self.model_name, temperature=0.7, google_api_key=self.gemini_key)
+                messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+                res = await llm.ainvoke(messages)
+                return str(res.content)
+            except Exception as e:
+                print(f"[LLM Warning] Gemini API call failed: {e}. Using fallback generator.")
                 return await self._fallback_generate(system_prompt, user_prompt)
         else:
             return await self._fallback_generate(system_prompt, user_prompt)
@@ -50,6 +63,19 @@ class LLMWrapper:
                 return
             except Exception as e:
                 print(f"[LLM Warning] OpenAI streaming failed: {e}. Falling back to chunked stream.")
+        elif self.provider == "gemini" and self.gemini_key and "your-gemini-api-key" not in self.gemini_key:
+            try:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                from langchain_core.messages import SystemMessage, HumanMessage
+
+                llm = ChatGoogleGenerativeAI(model=self.model_name, temperature=0.7, google_api_key=self.gemini_key, streaming=True)
+                messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+                async for chunk in llm.astream(messages):
+                    if chunk.content:
+                        yield str(chunk.content)
+                return
+            except Exception as e:
+                print(f"[LLM Warning] Gemini streaming failed: {e}. Falling back to chunked stream.")
 
         # Fallback intelligent streaming simulation
         full_text = await self._fallback_generate(system_prompt, user_prompt)
