@@ -2,8 +2,11 @@ import json
 import os
 import asyncio
 from typing import AsyncGenerator
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, Request, HTTPException
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore [missing-import]
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from app.models.schemas import InterviewRequest, InterviewResponse
@@ -103,5 +106,6 @@ async def event_stream_generator(session_id: str, message: str | None, candidate
 
 
 if __name__ == "__main__":
+    # pyrefly: ignore [missing-import]
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

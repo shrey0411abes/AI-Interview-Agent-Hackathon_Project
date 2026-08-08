@@ -1,7 +1,9 @@
 import json
 import os
 from typing import List, Dict, Any, Optional
+# pyrefly: ignore [missing-import]
 import chromadb
+# pyrefly: ignore [missing-import]
 from chromadb.config import Settings
 
 
