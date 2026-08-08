@@ -1,9 +1,9 @@
 export interface CandidateMember {
-  id: str;
-  name: str;
-  jobRole: str;
+  id: string;
+  name: string;
+  jobRole: string;
   yearsExperience: number;
-  education: str;
+  education: string;
   status?: string;
 }
 

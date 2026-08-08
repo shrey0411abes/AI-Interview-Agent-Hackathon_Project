@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Bot, Play, ShieldAlert } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { ChatInput } from './ChatInput';
@@ -11,7 +12,6 @@ export const ChatContainer: React.FC = () => {
   const { startInterview, sendCandidateAnswer } = useInterviewStream();
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll to bottom when new messages arrive or stream updates
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText, isStreaming]);
@@ -19,20 +19,19 @@ export const ChatContainer: React.FC = () => {
   const hasStarted = messages.length > 0 || isStreaming;
 
   return (
-    <div className="flex flex-col h-full bg-[#0d1322]/80 border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl">
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 bg-slate-900/60">
+    <div className="flex flex-col h-full glass rounded-2xl shadow-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--glass-border)]">
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <div>
-            <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-              <span>Technical Interview Session</span>
-              <span className="text-xs font-mono font-normal text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              Technical Interview Session
+              <span className="text-[10px] font-mono text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded border border-primary-500/20">
                 {selectedCandidate.member.jobRole}
               </span>
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Candidate: <strong className="text-slate-200">{selectedCandidate.member.name}</strong> • 
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               Probing Day {progress.currentDay}: {progress.currentDayTitle}
             </p>
           </div>
@@ -41,36 +40,44 @@ export const ChatContainer: React.FC = () => {
         {!hasStarted && (
           <button
             onClick={startInterview}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all transform hover:scale-105"
+            className="inline-flex items-center gap-1.5 px-3 py-2 gradient-brand text-white
+                       font-medium text-xs rounded-lg shadow-lg hover:scale-105 transition-all"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Begin Interview</span>
+            Begin
           </button>
         )}
       </div>
 
-      {/* Main chat messages container */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {!hasStarted ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-4 shadow-xl shadow-indigo-500/10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="h-full flex flex-col items-center justify-center text-center p-8"
+          >
+            <div className="w-16 h-16 rounded-2xl gradient-brand/20 border border-primary-500/30
+                            flex items-center justify-center text-primary-400 mb-4 shadow-xl">
               <Bot className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Ready to Conduct Interview</h3>
-            <p className="text-sm text-slate-400 max-w-md mb-6 leading-relaxed">
-              The AI Interview Agent will evaluate <span className="text-indigo-300 font-semibold">{selectedCandidate.member.name}</span> across 
-              minimum 8 questions spanning at least 4 curriculum days based on their actual course mission history.
+            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Ready to Conduct Interview</h3>
+            <p className="text-sm text-[var(--text-muted)] max-w-md mb-6 leading-relaxed">
+              The AI Interview Agent will evaluate{' '}
+              <span className="text-primary-400 font-semibold">{selectedCandidate.member.name}</span>{' '}
+              across minimum 8 questions spanning at least 4 curriculum days.
             </p>
             <button
               onClick={startInterview}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm rounded-xl shadow-xl shadow-indigo-500/25 transition-all transform hover:scale-105"
+              className="inline-flex items-center gap-2 px-6 py-3 gradient-brand text-white
+                         font-semibold text-sm rounded-xl shadow-xl shadow-indigo-500/25 hover:scale-105 transition-all"
             >
               <Play className="w-4 h-4 fill-current" />
-              <span>Start Assessment Now</span>
+              Start Assessment
             </button>
-          </div>
+          </motion.div>
         ) : (
-          <>
+          <AnimatePresence initial={false}>
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
@@ -93,19 +100,24 @@ export const ChatContainer: React.FC = () => {
             {isStreaming && !streamingText && <TypingIndicator />}
 
             {isComplete && (
-              <div className="my-6 p-4 rounded-xl glass-card border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-center flex items-center justify-center gap-2 text-sm font-medium">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="my-4 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10
+                           text-emerald-300 text-center flex items-center justify-center gap-2 text-sm font-medium"
+              >
                 <ShieldAlert className="w-4 h-4 text-emerald-400" />
-                <span>Interview Completed! Generating final technical assessment dashboard below...</span>
-              </div>
+                Interview complete — redirecting to results…
+              </motion.div>
             )}
 
             <div ref={chatBottomRef} />
-          </>
+          </AnimatePresence>
         )}
       </div>
 
-      {/* Footer input container */}
-      <div className="px-6 pb-6 pt-2 bg-slate-900/40 border-t border-slate-800/60">
+      {/* Input */}
+      <div className="px-5 pb-5 pt-2 border-t border-[var(--glass-border)]">
         <ChatInput onSendMessage={sendCandidateAnswer} isDisabled={!hasStarted || isStreaming || isComplete} />
       </div>
     </div>

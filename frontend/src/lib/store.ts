@@ -2,6 +2,29 @@ import { create } from 'zustand';
 import { Candidate, ChatMessage, Feedback, InterviewProgress } from './types';
 import candidateData from '../data/candidates.json';
 
+// ── Theme Store ──────────────────────────────────────────────
+type Theme = 'dark' | 'light';
+
+interface ThemeStore {
+  theme: Theme;
+  toggleTheme: () => void;
+  setTheme: (t: Theme) => void;
+}
+
+const systemPreference: Theme =
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-color-scheme: light)').matches
+    ? 'light'
+    : 'dark';
+
+export const useThemeStore = create<ThemeStore>((set) => ({
+  theme: systemPreference,
+  toggleTheme: () =>
+    set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+  setTheme: (t) => set({ theme: t }),
+}));
+
+// ── Interview Store ──────────────────────────────────────────
 interface InterviewStore {
   selectedCandidate: Candidate;
   sessionId: string;
@@ -11,6 +34,7 @@ interface InterviewStore {
   progress: InterviewProgress;
   feedback: Feedback | null;
   isComplete: boolean;
+  completedSessions: Array<{ sessionId: string; candidate: Candidate; feedback: Feedback }>;
 
   setCandidate: (candidate: Candidate) => void;
   setSessionId: (id: string) => void;
@@ -24,16 +48,19 @@ interface InterviewStore {
 }
 
 const defaultCandidate: Candidate = (candidateData.candidates[0] as Candidate) || {
-  member: {
-    id: "CAND-001",
-    name: "Sarah Johnson",
-    jobRole: "Senior Data Engineer",
-    yearsExperience: 9,
-    education: "MS Computer Science"
-  },
+  member: { id: 'CAND-001', name: 'Sarah Johnson', jobRole: 'Senior Data Engineer', yearsExperience: 9, education: 'MS Computer Science' },
   missions: [],
-  signals: { commitDays: 28, missionsCompleted: 30, missionsFirstTry: 20 }
+  signals: { commitDays: 28, missionsCompleted: 30, missionsFirstTry: 20 },
 };
+
+const freshProgress = (): InterviewProgress => ({
+  questionCount: 0,
+  daysProbedCount: 0,
+  currentDay: 7,
+  currentDayTitle: 'Embeddings Explained',
+  probedDaysList: [],
+  isFollowup: false,
+});
 
 export const useInterviewStore = create<InterviewStore>((set, get) => ({
   selectedCandidate: defaultCandidate,
@@ -41,18 +68,12 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
   messages: [],
   isStreaming: false,
   streamingText: '',
-  progress: {
-    questionCount: 0,
-    daysProbedCount: 0,
-    currentDay: 7,
-    currentDayTitle: 'Embeddings Explained',
-    probedDaysList: [],
-    isFollowup: false,
-  },
+  progress: freshProgress(),
   feedback: null,
   isComplete: false,
+  completedSessions: [],
 
-  setCandidate: (candidate: Candidate) => {
+  setCandidate: (candidate) =>
     set({
       selectedCandidate: candidate,
       sessionId: `session-${Date.now()}`,
@@ -61,18 +82,10 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
       streamingText: '',
       feedback: null,
       isComplete: false,
-      progress: {
-        questionCount: 0,
-        daysProbedCount: 0,
-        currentDay: 7,
-        currentDayTitle: 'Embeddings Explained',
-        probedDaysList: [],
-        isFollowup: false,
-      }
-    });
-  },
+      progress: freshProgress(),
+    }),
 
-  setSessionId: (id: string) => set({ sessionId: id }),
+  setSessionId: (id) => set({ sessionId: id }),
 
   addMessage: (msg) => {
     const newMessage: ChatMessage = {
@@ -80,25 +93,20 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
       timestamp: new Date(),
       ...msg,
     };
-    set((state) => ({
-      messages: [...state.messages, newMessage],
-    }));
+    set((s) => ({ messages: [...s.messages, newMessage] }));
   },
 
   startStreaming: () => set({ isStreaming: true, streamingText: '' }),
 
-  updateStreamingText: (chunk: string) => {
-    set((state) => ({
-      streamingText: state.streamingText + chunk,
-    }));
-  },
+  updateStreamingText: (chunk) =>
+    set((s) => ({ streamingText: s.streamingText + chunk })),
 
   finishStreaming: (metadata) => {
     const text = get().streamingText;
     if (text.trim()) {
       get().addMessage({
         sender: 'interviewer',
-        text: text,
+        text,
         isFollowup: metadata?.isFollowup,
         day: metadata?.day,
         dayTitle: metadata?.dayTitle,
@@ -107,25 +115,23 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
     set({ isStreaming: false, streamingText: '' });
   },
 
-  updateProgress: (p) => {
-    set((state) => {
-      const updatedDaysList = new Set(state.progress.probedDaysList);
-      if (p.currentDay) {
-        updatedDaysList.add(p.currentDay);
-      }
-      return {
-        progress: {
-          ...state.progress,
-          ...p,
-          probedDaysList: Array.from(updatedDaysList),
-        },
-      };
-    });
+  updateProgress: (p) =>
+    set((s) => {
+      const days = new Set(s.progress.probedDaysList);
+      if (p.currentDay) days.add(p.currentDay);
+      return { progress: { ...s.progress, ...p, probedDaysList: Array.from(days) } };
+    }),
+
+  setFeedback: (feedback) => {
+    const { selectedCandidate, sessionId, completedSessions } = get();
+    const already = completedSessions.find((cs) => cs.sessionId === sessionId);
+    const updated = already
+      ? completedSessions
+      : [...completedSessions, { sessionId, candidate: selectedCandidate, feedback }];
+    set({ feedback, isComplete: true, completedSessions: updated });
   },
 
-  setFeedback: (feedback: Feedback) => set({ feedback, isComplete: true }),
-
-  resetInterview: () => {
+  resetInterview: () =>
     set({
       sessionId: `session-${Date.now()}`,
       messages: [],
@@ -133,14 +139,6 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
       streamingText: '',
       feedback: null,
       isComplete: false,
-      progress: {
-        questionCount: 0,
-        daysProbedCount: 0,
-        currentDay: 7,
-        currentDayTitle: 'Embeddings Explained',
-        probedDaysList: [],
-        isFollowup: false,
-      }
-    });
-  }
+      progress: freshProgress(),
+    }),
 }));
