@@ -3,6 +3,10 @@ import { Candidate } from './types';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export interface SSEPayload {
+  type?: 'phase' | 'token' | 'metadata';
+  stage?: string;
+  label?: string;
+  provider?: string;
   token?: string;
   done?: boolean;
   reply?: string;
@@ -19,6 +23,7 @@ export async function sendInterviewTurnStream(
   options: {
     message?: string;
     candidate?: Candidate;
+    onPhase?: (phase: SSEPayload) => void;
     onToken: (token: string) => void;
     onComplete: (data: SSEPayload) => void;
     onError: (err: any) => void;
@@ -69,6 +74,9 @@ export async function sendInterviewTurnStream(
           }
           try {
             const parsed: SSEPayload = JSON.parse(rawData);
+            if (parsed.type === 'phase' && options.onPhase) {
+              options.onPhase(parsed);
+            }
             if (parsed.token) {
               options.onToken(parsed.token);
             }

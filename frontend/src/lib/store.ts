@@ -24,6 +24,8 @@ export const useThemeStore = create<ThemeStore>((set) => ({
   setTheme: (t) => set({ theme: t }),
 }));
 
+import { SSEPayload } from './api';
+
 // ── Interview Store ──────────────────────────────────────────
 interface InterviewStore {
   selectedCandidate: Candidate;
@@ -31,6 +33,7 @@ interface InterviewStore {
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingText: string;
+  thinkingPhases: SSEPayload[];
   progress: InterviewProgress;
   feedback: Feedback | null;
   isComplete: boolean;
@@ -40,6 +43,7 @@ interface InterviewStore {
   setSessionId: (id: string) => void;
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   startStreaming: () => void;
+  addThinkingPhase: (phase: SSEPayload) => void;
   updateStreamingText: (chunk: string) => void;
   finishStreaming: (metadata?: { isFollowup?: boolean; day?: number; dayTitle?: string }) => void;
   updateProgress: (p: Partial<InterviewProgress>) => void;
@@ -68,6 +72,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
   messages: [],
   isStreaming: false,
   streamingText: '',
+  thinkingPhases: [],
   progress: freshProgress(),
   feedback: null,
   isComplete: false,
@@ -80,6 +85,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
       messages: [],
       isStreaming: false,
       streamingText: '',
+      thinkingPhases: [],
       feedback: null,
       isComplete: false,
       progress: freshProgress(),
@@ -96,7 +102,10 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
     set((s) => ({ messages: [...s.messages, newMessage] }));
   },
 
-  startStreaming: () => set({ isStreaming: true, streamingText: '' }),
+  startStreaming: () => set({ isStreaming: true, streamingText: '', thinkingPhases: [] }),
+
+  addThinkingPhase: (phase) =>
+    set((s) => ({ thinkingPhases: [...s.thinkingPhases, phase] })),
 
   updateStreamingText: (chunk) =>
     set((s) => ({ streamingText: s.streamingText + chunk })),
@@ -112,7 +121,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
         dayTitle: metadata?.dayTitle,
       });
     }
-    set({ isStreaming: false, streamingText: '' });
+    set({ isStreaming: false, streamingText: '', thinkingPhases: [] });
   },
 
   updateProgress: (p) =>

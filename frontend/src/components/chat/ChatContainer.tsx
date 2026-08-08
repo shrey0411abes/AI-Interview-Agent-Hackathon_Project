@@ -3,6 +3,7 @@ import { Bot, Play, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
+import { ThinkingVisualizer } from './ThinkingVisualizer';
 import { ChatInput } from './ChatInput';
 import { useInterviewStore } from '../../lib/store';
 import { useInterviewStream } from '../../hooks/useInterviewStream';
@@ -81,6 +82,8 @@ export const ChatContainer: React.FC = () => {
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
+
+            <ThinkingVisualizer />
 
             {isStreaming && streamingText && (
               <MessageBubble

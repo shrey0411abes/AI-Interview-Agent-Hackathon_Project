@@ -71,38 +71,21 @@ async def interview_endpoint(req: InterviewRequest, request: Request):
 
 async def event_stream_generator(session_id: str, message: str | None, candidate_dict: dict | None) -> AsyncGenerator[str, None]:
     """
-    Server-Sent Events (SSE) generator streaming interview reply token-by-token to React UI.
+    Server-Sent Events (SSE) generator streaming real-time phase transitions,
+    tokens, and final metadata.
     """
-    result = await agent_graph.process_turn(
-        session_id=session_id,
-        message=message,
-        candidate_data=candidate_dict
-    )
-
-    reply_text = result.get("reply", "")
-    words = reply_text.split(" ")
-
-    # Stream tokens word-by-word
-    for i, word in enumerate(words):
-        chunk = word if i == 0 else " " + word
-        payload = json.dumps({"token": chunk, "done": False})
-        yield f"data: {payload}\n\n"
-        await asyncio.sleep(0.015)
-
-    # Final event containing full metadata & feedback
-    final_payload = json.dumps({
-        "token": "",
-        "done": result.get("done", False),
-        "reply": reply_text,
-        "feedback": result.get("feedback"),
-        "currentQuestionIndex": result.get("currentQuestionIndex"),
-        "daysProbedCount": result.get("daysProbedCount"),
-        "currentDay": result.get("currentDay"),
-        "currentDayTitle": result.get("currentDayTitle"),
-        "isFollowup": result.get("isFollowup")
-    })
-    yield f"data: {final_payload}\n\n"
-    yield "data: [DONE]\n\n"
+    async for event in agent_graph.process_turn_stream(session_id, message, candidate_dict):
+        event_type = event.get("type")
+        if event_type == "phase":
+            payload = json.dumps(event)
+            yield f"data: {payload}\n\n"
+        elif event_type == "token":
+            payload = json.dumps({"token": event.get("token"), "done": False})
+            yield f"data: {payload}\n\n"
+        elif event_type == "metadata":
+            payload = json.dumps(event)
+            yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ export function useInterviewStream() {
     isStreaming,
     addMessage,
     startStreaming,
+    addThinkingPhase,
     updateStreamingText,
     finishStreaming,
     updateProgress,
@@ -25,6 +26,7 @@ export function useInterviewStream() {
 
     await sendInterviewTurnStream(sessionId, {
       candidate: selectedCandidate,
+      onPhase: (phase) => addThinkingPhase(phase),
       onToken: (token) => {
         updateStreamingText(token);
       },
@@ -56,7 +58,7 @@ export function useInterviewStream() {
       day: finalMetadata.currentDay,
       dayTitle: finalMetadata.currentDayTitle,
     });
-  }, [sessionId, selectedCandidate, startStreaming, updateStreamingText, finishStreaming, updateProgress, setFeedback, addToast]);
+  }, [sessionId, selectedCandidate, startStreaming, addThinkingPhase, updateStreamingText, finishStreaming, updateProgress, setFeedback, addToast]);
 
   const sendCandidateAnswer = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming) return;
@@ -71,6 +73,7 @@ export function useInterviewStream() {
 
     await sendInterviewTurnStream(sessionId, {
       message: text.trim(),
+      onPhase: (phase) => addThinkingPhase(phase),
       onToken: (token) => {
         updateStreamingText(token);
       },
@@ -102,7 +105,7 @@ export function useInterviewStream() {
       day: finalMetadata.currentDay,
       dayTitle: finalMetadata.currentDayTitle,
     });
-  }, [sessionId, isStreaming, addMessage, startStreaming, updateStreamingText, finishStreaming, updateProgress, setFeedback, addToast]);
+  }, [sessionId, isStreaming, addMessage, startStreaming, addThinkingPhase, updateStreamingText, finishStreaming, updateProgress, setFeedback, addToast]);
 
   return {
     startInterview,
