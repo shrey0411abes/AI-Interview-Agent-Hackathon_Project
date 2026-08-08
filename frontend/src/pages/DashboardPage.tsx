@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Play, Search, Users, ChevronRight,
-  Zap, CheckCircle, Clock, BarChart3, Briefcase, GraduationCap
+  Zap, CheckCircle, Clock, BarChart3, Briefcase, GraduationCap,
+  Filter, ArrowUpDown, History, Shield
 } from 'lucide-react';
 import { Navbar } from '../components/layout/Navbar';
+import { AnimatedNumber } from '../components/ui/AnimatedNumber';
 import { Candidate } from '../lib/types';
 import { useInterviewStore } from '../lib/store';
 import candidateData from '../data/candidates.json';
@@ -17,6 +19,8 @@ const fadeUp = {
     transition: { delay: i * 0.08, duration: 0.4, ease: 'easeOut' },
   }),
 };
+
+type SortKey = 'missions' | 'experience' | 'accuracy';
 
 // ── Candidate Card on Dashboard ───────────────────────────────────────
 const DashboardCandidateCard: React.FC<{
@@ -49,11 +53,11 @@ const DashboardCandidateCard: React.FC<{
       custom={index}
       initial="hidden"
       animate="visible"
-      whileHover={{ y: -3 }}
-      className={`glass-card rounded-2xl p-5 border transition-all duration-300 cursor-pointer
+      whileHover={{ y: -4, scale: 1.01 }}
+      className={`glass-card rounded-2xl p-5 border transition-all duration-300 cursor-pointer shadow-md hover:shadow-xl
                   ${isSelected
                     ? 'border-primary-500/60 shadow-lg shadow-primary-500/20'
-                    : 'border-transparent hover:border-primary-500/20'
+                    : 'border-[var(--glass-card-border)] hover:border-primary-500/30'
                   }`}
       onClick={onSelect}
     >
@@ -129,12 +133,40 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { selectedCandidate, setCandidate, completedSessions } = useInterviewStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState<SortKey>('missions');
 
   const allCandidates = candidateData.candidates as Candidate[];
-  const filtered = allCandidates.filter((c) =>
-    c.member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.member.jobRole.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
+  // Roles list
+  const roles = useMemo(() => {
+    const set = new Set<string>();
+    allCandidates.forEach((c) => set.add(c.member.jobRole));
+    return ['ALL', ...Array.from(set)];
+  }, [allCandidates]);
+
+  // Filter & Sort logic
+  const filteredAndSorted = useMemo(() => {
+    return allCandidates
+      .filter((c) => {
+        const matchesSearch =
+          c.member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.member.jobRole.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesRole = roleFilter === 'ALL' || c.member.jobRole === roleFilter;
+        return matchesSearch && matchesRole;
+      })
+      .sort((a, b) => {
+        const aSignals = a.signals ?? { missionsCompleted: 0, missionsFirstTry: 0 };
+        const bSignals = b.signals ?? { missionsCompleted: 0, missionsFirstTry: 0 };
+        const aAcc = aSignals.missionsCompleted > 0 ? aSignals.missionsFirstTry / aSignals.missionsCompleted : 0;
+        const bAcc = bSignals.missionsCompleted > 0 ? bSignals.missionsFirstTry / bSignals.missionsCompleted : 0;
+
+        if (sortBy === 'missions') return bSignals.missionsCompleted - aSignals.missionsCompleted;
+        if (sortBy === 'experience') return b.member.yearsExperience - a.member.yearsExperience;
+        if (sortBy === 'accuracy') return bAcc - aAcc;
+        return 0;
+      });
+  }, [allCandidates, searchQuery, roleFilter, sortBy]);
 
   const handleStart = () => {
     navigate(`/interview/${selectedCandidate.member.id}`);
@@ -161,18 +193,17 @@ export const DashboardPage: React.FC = () => {
               <span>Dashboard</span>
             </div>
             <h1 className="font-heading text-3xl font-bold text-[var(--text-primary)] mb-1">
-              Select a Candidate
+              Candidate Selection
             </h1>
             <p className="text-[var(--text-secondary)] text-sm">
-              Choose a candidate to begin an adaptive AI-powered technical interview.
+              Select a candidate co-pilot to trigger an adaptive curriculum-grounded interview.
             </p>
           </motion.div>
 
-          {/* Stats strip */}
+          {/* Animated Stat Banner */}
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            initial="hidden"
+            animate="visible"
             className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"
           >
             {[
@@ -180,52 +211,91 @@ export const DashboardPage: React.FC = () => {
               { icon: <CheckCircle className="w-4 h-4 text-emerald-400" />, value: completedSessions.length, label: 'Sessions done' },
               { icon: <Clock className="w-4 h-4 text-amber-400" />, value: '~8 min', label: 'Avg. session' },
               { icon: <BarChart3 className="w-4 h-4 text-accent-purple" />, value: '5–10', label: 'Questions asked' },
-            ].map(({ icon, value, label }) => (
-              <div key={label} className="glass-card rounded-xl p-4 flex items-center gap-3">
+            ].map(({ icon, value, label }, i) => (
+              <motion.div
+                key={label}
+                variants={fadeUp}
+                custom={i}
+                className="glass-card rounded-xl p-4 flex items-center gap-3 border border-[var(--glass-card-border)] hover:scale-[1.02] transition-transform"
+              >
                 <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                   {icon}
                 </div>
                 <div>
-                  <p className="font-bold text-[var(--text-primary)] text-lg leading-none">{value}</p>
+                  <p className="font-bold text-[var(--text-primary)] text-lg leading-none">
+                    <AnimatedNumber value={value} />
+                  </p>
                   <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{label}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </motion.div>
 
-          {/* Search bar */}
+          {/* Controls strip: Search, Role Filter, Sort By */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="relative mb-6"
+            className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-6"
           >
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-            <input
-              type="text"
-              placeholder="Search candidates by name or role..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 glass-card rounded-xl text-sm
-                         text-[var(--text-primary)] placeholder-[var(--text-muted)]
-                         border border-transparent focus:border-primary-500/50 outline-none transition-colors"
-            />
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                placeholder="Search candidate by name or role..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 glass-card rounded-xl text-xs
+                           text-[var(--text-primary)] placeholder-[var(--text-muted)]
+                           border border-[var(--glass-card-border)] focus:border-primary-500/50 outline-none transition-colors"
+              />
+            </div>
+
+            {/* Filter & Sort Dropdowns */}
+            <div className="flex items-center gap-3">
+              {/* Role filter */}
+              <div className="flex items-center gap-1.5 glass-card rounded-xl px-3 py-1.5 border border-[var(--glass-card-border)]">
+                <Filter className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="bg-transparent text-[var(--text-primary)] text-xs focus:outline-none cursor-pointer"
+                >
+                  {roles.map((role) => (
+                    <option key={role} value={role} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">
+                      {role === 'ALL' ? 'All Roles' : role}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort by */}
+              <div className="flex items-center gap-1.5 glass-card rounded-xl px-3 py-1.5 border border-[var(--glass-card-border)]">
+                <ArrowUpDown className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortKey)}
+                  className="bg-transparent text-[var(--text-primary)] text-xs focus:outline-none cursor-pointer"
+                >
+                  <option value="missions" className="bg-[var(--bg-surface)] text-[var(--text-primary)]">Sort: Missions</option>
+                  <option value="experience" className="bg-[var(--bg-surface)] text-[var(--text-primary)]">Sort: Experience</option>
+                  <option value="accuracy" className="bg-[var(--bg-surface)] text-[var(--text-primary)]">Sort: 1st-Try Rate</option>
+                </select>
+              </div>
+            </div>
           </motion.div>
 
           {/* Candidate grid */}
-          {filtered.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-20"
-            >
+          {filteredAndSorted.length === 0 ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 glass rounded-2xl">
               <Users className="w-12 h-12 mx-auto text-[var(--text-muted)] mb-3 opacity-40" />
-              <p className="text-[var(--text-muted)]">No candidates match your search.</p>
+              <p className="text-[var(--text-muted)] text-sm">No candidates match your search or filter criteria.</p>
             </motion.div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <AnimatePresence>
-                {filtered.map((candidate, i) => (
+                {filteredAndSorted.map((candidate, i) => (
                   <DashboardCandidateCard
                     key={candidate.member.id}
                     candidate={candidate}
@@ -239,53 +309,43 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* Selected candidate CTA (sticky bottom on mobile) */}
-          <AnimatePresence>
-            {selectedCandidate && (
-              <motion.div
-                key="start-cta"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 sm:hidden"
-              >
-                <button
-                  onClick={handleStart}
-                  className="gradient-brand text-white px-8 py-3.5 rounded-2xl font-semibold text-sm
-                             shadow-2xl shadow-indigo-500/40 flex items-center gap-2"
-                >
-                  <Zap className="w-4 h-4" />
-                  Interview {selectedCandidate.member.name.split(' ')[0]}
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Completed sessions */}
+          {/* Recent Sessions History Panel */}
           {completedSessions.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-12"
+              className="mt-12 glass-card rounded-2xl p-6 border border-[var(--glass-card-border)]"
             >
-              <h2 className="font-heading text-xl font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-                Completed Sessions
-              </h2>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-heading text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <History className="w-5 h-5 text-emerald-400" />
+                  Recent Session History ({completedSessions.length})
+                </h2>
+                <span className="text-xs text-[var(--text-muted)]">In-memory active browser session history</span>
+              </div>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {completedSessions.map((session) => (
                   <button
                     key={session.sessionId}
                     onClick={() => navigate(`/results/${session.sessionId}`)}
-                    className="glass-card rounded-xl p-4 text-left hover:border-emerald-500/30 border border-transparent
-                               transition-colors group flex items-center justify-between"
+                    className="glass-card rounded-xl p-3.5 text-left hover:border-emerald-500/40 border border-transparent
+                               transition-all group flex items-center justify-between"
                   >
-                    <div>
-                      <p className="font-semibold text-[var(--text-primary)] text-sm">{session.candidate.member.name}</p>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5">{session.candidate.member.jobRole}</p>
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-[var(--text-primary)] text-xs truncate">
+                          {session.candidate.member.name}
+                        </p>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                          {session.feedback.verdict || 'EVAL'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
+                        {session.candidate.member.jobRole}
+                      </p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
+                    <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] shrink-0 transition-colors" />
                   </button>
                 ))}
               </div>
