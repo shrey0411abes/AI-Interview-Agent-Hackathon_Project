@@ -236,6 +236,8 @@ export const LandingPage: React.FC = () => {
             >
               View on GitHub
             </a>
+            </motion.div>
+            </section>
         {/* ── Stats bar ────────────────────────────────────── */}
         <section className="px-4 sm:px-6 py-8 max-w-4xl mx-auto">
           <motion.div
