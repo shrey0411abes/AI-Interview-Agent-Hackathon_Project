@@ -17,12 +17,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isDisabled 
     }
   }, [text]);
 
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!text.trim() || isDisabled) return;
+    if (!text.trim() || isDisabled || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
     onSendMessage(text.trim());
     setText('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+    setTimeout(() => {
+      isSubmittingRef.current = false;
+    }, 400);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

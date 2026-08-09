@@ -26,6 +26,8 @@ export const useThemeStore = create<ThemeStore>((set) => ({
 
 import { SSEPayload } from './api';
 
+export type InitStatus = 'idle' | 'initializing' | 'initialized' | 'failed';
+
 // ── Interview Store ──────────────────────────────────────────
 interface InterviewStore {
   selectedCandidate: Candidate;
@@ -39,16 +41,23 @@ interface InterviewStore {
   isComplete: boolean;
   completedSessions: Array<{ sessionId: string; candidate: Candidate; feedback: Feedback }>;
 
+  // Session Initialization Lifecycle tracking
+  initializationStatus: Record<string, InitStatus>;
+
   setCandidate: (candidate: Candidate) => void;
   setSessionId: (id: string) => void;
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   startStreaming: () => void;
+  cancelStreaming: () => void;
   addThinkingPhase: (phase: SSEPayload) => void;
   updateStreamingText: (chunk: string) => void;
   finishStreaming: (metadata?: { isFollowup?: boolean; day?: number; dayTitle?: string }) => void;
   updateProgress: (p: Partial<InterviewProgress>) => void;
   setFeedback: (feedback: Feedback) => void;
   resetInterview: () => void;
+
+  claimSessionInitialization: (sessionId: string) => boolean;
+  setInitializationStatus: (sessionId: string, status: InitStatus) => void;
 }
 
 const defaultCandidate: Candidate = (candidateData.candidates[0] as Candidate) || {
@@ -77,11 +86,13 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
   feedback: null,
   isComplete: false,
   completedSessions: [],
+  initializationStatus: {},
 
-  setCandidate: (candidate) =>
-    set({
+  setCandidate: (candidate) => {
+    const newSessionId = `session-${Date.now()}`;
+    set((s) => ({
       selectedCandidate: candidate,
-      sessionId: `session-${Date.now()}`,
+      sessionId: newSessionId,
       messages: [],
       isStreaming: false,
       streamingText: '',
@@ -89,11 +100,50 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
       feedback: null,
       isComplete: false,
       progress: freshProgress(),
-    }),
+      initializationStatus: { ...s.initializationStatus, [newSessionId]: 'idle' },
+    }));
+  },
 
   setSessionId: (id) => set({ sessionId: id }),
 
+  claimSessionInitialization: (sessionId) => {
+    const current = get().initializationStatus[sessionId] || 'idle';
+    if (current === 'initializing' || current === 'initialized') {
+      console.warn(`[INTERVIEW_INIT_DUPLICATE_BLOCKED] sessionId=${sessionId} currentStatus=${current}`);
+      return false;
+    }
+    set((s) => ({
+      initializationStatus: { ...s.initializationStatus, [sessionId]: 'initializing' },
+    }));
+    console.log(`[INTERVIEW_INIT_CLAIMED] sessionId=${sessionId}`);
+    return true;
+  },
+
+  setInitializationStatus: (sessionId, status) => {
+    set((s) => ({
+      initializationStatus: { ...s.initializationStatus, [sessionId]: status },
+    }));
+    console.log(`[INTERVIEW_INIT_STATUS_UPDATED] sessionId=${sessionId} status=${status}`);
+  },
+
   addMessage: (msg) => {
+    const state = get();
+    // Check if duplicate message exists (matching requestId or matching sender + normalized text within 5s window)
+    const isDuplicate = state.messages.some((m) => {
+      if (msg.requestId && m.requestId && msg.requestId === m.requestId) {
+        return true;
+      }
+      const normNew = msg.text.trim().toLowerCase();
+      const normExisting = m.text.trim().toLowerCase();
+      const isRecent = Math.abs(Date.now() - new Date(m.timestamp).getTime()) < 5000;
+      return m.sender === msg.sender && normNew === normExisting && isRecent;
+    });
+
+    if (isDuplicate) {
+      console.warn(`[DUPLICATE_PREVENTED] Discarded duplicate ${msg.sender} message: '${msg.text.substring(0, 40)}...'`);
+      return;
+    }
+
     const newMessage: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: new Date(),
@@ -104,6 +154,11 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
 
   startStreaming: () => set({ isStreaming: true, streamingText: '', thinkingPhases: [] }),
 
+  cancelStreaming: () => {
+    console.warn(`[STREAM_CANCELLED] Resetting streaming state without committing message.`);
+    set({ isStreaming: false, streamingText: '', thinkingPhases: [] });
+  },
+
   addThinkingPhase: (phase) =>
     set((s) => ({ thinkingPhases: [...s.thinkingPhases, phase] })),
 
@@ -111,8 +166,8 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
     set((s) => ({ streamingText: s.streamingText + chunk })),
 
   finishStreaming: (metadata) => {
-    const text = get().streamingText;
-    if (text.trim()) {
+    const text = get().streamingText.trim() || (metadata as any)?.reply?.trim() || '';
+    if (text) {
       get().addMessage({
         sender: 'interviewer',
         text,
@@ -140,14 +195,17 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
     set({ feedback, isComplete: true, completedSessions: updated });
   },
 
-  resetInterview: () =>
-    set({
-      sessionId: `session-${Date.now()}`,
+  resetInterview: () => {
+    const newSessionId = `session-${Date.now()}`;
+    set((s) => ({
+      sessionId: newSessionId,
       messages: [],
       isStreaming: false,
       streamingText: '',
       feedback: null,
       isComplete: false,
       progress: freshProgress(),
-    }),
+      initializationStatus: { ...s.initializationStatus, [newSessionId]: 'idle' },
+    }));
+  },
 }));

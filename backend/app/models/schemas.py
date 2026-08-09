@@ -36,6 +36,8 @@ class InterviewRequest(BaseModel):
     sessionId: str = Field(..., description="Unique session identifier for tracking interview state")
     candidate: Optional[CandidateProfile] = Field(None, description="Candidate profile provided on initial request")
     message: Optional[str] = Field(None, description="Candidate answer provided on subsequent turns")
+    requestId: Optional[str] = Field(None, description="Unique client-side request ID for turn idempotency")
+
 
 
 class TopicScore(BaseModel):

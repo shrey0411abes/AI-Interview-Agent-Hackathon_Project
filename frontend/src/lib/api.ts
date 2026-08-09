@@ -23,6 +23,7 @@ export async function sendInterviewTurnStream(
   options: {
     message?: string;
     candidate?: Candidate;
+    requestId?: string;
     onPhase?: (phase: SSEPayload) => void;
     onToken: (token: string) => void;
     onComplete: (data: SSEPayload) => void;
@@ -34,6 +35,7 @@ export async function sendInterviewTurnStream(
       sessionId,
       ...(options.candidate ? { candidate: options.candidate } : {}),
       ...(options.message ? { message: options.message } : {}),
+      ...(options.requestId ? { requestId: options.requestId } : {}),
     };
 
     const response = await fetch(`${API_BASE_URL}/api/interview?stream=true`, {
@@ -46,7 +48,7 @@ export async function sendInterviewTurnStream(
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText || 'Server error'}`);
     }
 
     const reader = response.body?.getReader();
@@ -80,7 +82,7 @@ export async function sendInterviewTurnStream(
             if (parsed.token) {
               options.onToken(parsed.token);
             }
-            if (parsed.reply !== undefined || parsed.done !== undefined) {
+            if (parsed.type === 'metadata' || (parsed.reply !== undefined && !parsed.token)) {
               options.onComplete(parsed);
             }
           } catch (e) {

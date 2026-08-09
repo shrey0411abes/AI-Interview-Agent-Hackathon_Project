@@ -55,7 +55,7 @@ async def interview_endpoint(req: InterviewRequest, request: Request):
 
     if stream_requested:
         return StreamingResponse(
-            event_stream_generator(req.sessionId, req.message, candidate_dict),
+            event_stream_generator(req.sessionId, req.message, candidate_dict, req.requestId),
             media_type="text/event-stream"
         )
 
@@ -63,18 +63,20 @@ async def interview_endpoint(req: InterviewRequest, request: Request):
     result = await agent_graph.process_turn(
         session_id=req.sessionId,
         message=req.message,
-        candidate_data=candidate_dict
+        candidate_data=candidate_dict,
+        # pyrefly: ignore [unexpected-keyword]
+        request_id=req.requestId
     )
 
     return JSONResponse(content=result)
 
 
-async def event_stream_generator(session_id: str, message: str | None, candidate_dict: dict | None) -> AsyncGenerator[str, None]:
+async def event_stream_generator(session_id: str, message: str | None, candidate_dict: dict | None, request_id: str | None = None) -> AsyncGenerator[str, None]:
     """
     Server-Sent Events (SSE) generator streaming real-time phase transitions,
     tokens, and final metadata.
     """
-    async for event in agent_graph.process_turn_stream(session_id, message, candidate_dict):
+    async for event in agent_graph.process_turn_stream(session_id, message, candidate_dict, request_id):
         event_type = event.get("type")
         if event_type == "phase":
             payload = json.dumps(event)

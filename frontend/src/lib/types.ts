@@ -50,6 +50,7 @@ export interface ChatMessage {
   isFollowup?: boolean;
   day?: number;
   dayTitle?: string;
+  requestId?: string;
 }
 
 export interface InterviewProgress {
